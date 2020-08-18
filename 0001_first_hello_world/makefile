@@ -1,18 +1,21 @@
 CC = nvcc
 CFLAGS = -Wall
 
-BUILD_DIR := ./build
+BUILD_DIR = build
 
 SOURCE=$(wildcard *.cu)
-EXECS=$(patsubst %.cu,%,$(SOURCE))  
+EXECS=$(patsubst %.cu,$(BUILD_DIR)/%,$(SOURCE))  
 
 all: $(EXECS)
 
-% : %.cu
-	$(CC) -o $(BUILD_DIR)/$@ $<
+$(BUILD_DIR)/% : %.cu
+	@echo + CC $<
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -o $@ $<
 
+# Don't remove *.o files automatically
+# .SECONDARY: $(OBJS)
 
-
-.PHONY:clean  
+.PHONY:clean  all
 clean:
-	-rm -f build/*
+	-rm -rf $(BUILD_DIR)

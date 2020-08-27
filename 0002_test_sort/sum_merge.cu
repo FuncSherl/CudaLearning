@@ -14,6 +14,10 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+__global__ int do_sum_merge(int *datas){
+    
+}
+
 int main(){
     CUDA_CALL(cudaSetDevice(0));
     //init
@@ -25,7 +29,9 @@ int main(){
     }
     int *datas=NULL;
     CUDA_CALL(cudaMalloc((void **)&datas, length * sizeof(int)));
-
+    //cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count,cudaMemcpyKind kind )
+    //cudaMemcpyHostToHost   cudaMemcpyHossToDevice   cudaMemcpyDeviceToHost   cudaMemcpuDeviceToDevice
+    CUDA_CALL(cudaMemcpy(datas, a, length * sizeof(int), cudaMemcpyHossToDevice));
 
 
     return 0;

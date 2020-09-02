@@ -1,9 +1,9 @@
 #include <stdio.h>
-
+#include <cassert>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#define CUDA_CALL(x) {const cudaError_t a=(x);if (a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(a), a); cudaDeviceReset(); } }
+#define CUDA_CALL(x) {const cudaError_t a=(x);if (a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(a), a); cudaDeviceReset(); assert(0);} }
 
 int main(){
     CUDA_CALL(cudaSetDevice(0));
@@ -15,7 +15,7 @@ int main(){
         b[i]=i*i;
     }
     int *datas=NULL;
-    CUDA_CALL(cudaMalloc((void **)&datas, length * sizeof(int)));
+    cudaMalloc((void **)&datas, length * sizeof(int));
 
 
 

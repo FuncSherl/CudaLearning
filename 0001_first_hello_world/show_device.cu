@@ -16,7 +16,7 @@ int main()
     for(int i=0;i<deviceCount;i++)
     {
         cudaDeviceProp devProp;
-        cudaGetDeviceProperties(&devProp, i);
+        CUDA_CALL(cudaGetDeviceProperties(&devProp, i));
         std::cout << "GPU device name: " << i << " : " << devProp.name << std::endl;
         std::cout << "device total Global Mem: " << devProp.totalGlobalMem / 1024 / 1024 << "MB" << std::endl;
         std::cout << "multiProcessor(SM) Count: " << devProp.multiProcessorCount << std::endl;

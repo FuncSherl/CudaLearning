@@ -1,18 +1,9 @@
-#define CUDA_CALL(x)                                                         \
-    {                                                                        \
-        const cudaError_t a = (x);                                           \
-        if (a != cudaSuccess) {                                              \
-            printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(a), \
-                   a);                                                       \
-            cudaDeviceReset();                                               \
-            assert(0);                                                       \
-        }                                                                    \
-    }
-
 #include <stdio.h>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+
+#define CUDA_CALL(x) {const cudaError_t a=(x);if (a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(a), a); cudaDeviceReset(); } }
 
 int main(){
     CUDA_CALL(cudaSetDevice(0));

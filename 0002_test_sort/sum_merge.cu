@@ -6,7 +6,10 @@
 
 using namespace std;
 
-#define CUDA_CALL(x) {const cudaError_t a=(x);if (a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(a), a); cudaDeviceReset(); assert(0);} }
+// 用宏变长参数来实现
+#define CUDA_CALL(...) {cudaError_t _cuda_tep_set_not_repeat_a=(__VA_ARGS__);if (_cuda_tep_set_not_repeat_a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(_cuda_tep_set_not_repeat_a), _cuda_tep_set_not_repeat_a); cudaDeviceReset(); assert(0);} }
+
+//#define CUDA_CALL(...) cout<<__VA_ARGS__<<endl;
 
 //kernel function must return void
 __global__ void do_sum_merge(int *datas, int n){
@@ -35,24 +38,24 @@ void cuda_call(cudaError_t a){
 int main(){
     CUDA_CALL(cudaSetDevice(0));
     //init
-    const int length=1024;
+    const int length=1025;
     int a[length], b[length];
     for (int i=0;i<length;++i){
         a[i]=1;
         b[i]=i;
     }
     int *datas=NULL;
-    cudaMalloc((void **)&datas, length * sizeof(int));
+    CUDA_CALL(cudaMalloc((void **)&datas, length * sizeof(int)));
     //cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count,cudaMemcpyKind kind )
     //cudaMemcpyHostToHost   cudaMemcpyHossToDevice   cudaMemcpyDeviceToHost   cudaMemcpuDeviceToDevice
-    cuda_call( cudaMemcpy(datas,a,length*sizeof(int),cudaMemcpyHostToDevice) );
+    CUDA_CALL( cudaMemcpy(datas,a,length*sizeof(int),cudaMemcpyHostToDevice) );
 
     do_sum_merge<<<1,length>>>(datas,length);
-    cuda_call(cudaGetLastError());
+    CUDA_CALL(cudaGetLastError());
 
-    cuda_call( cudaThreadSynchronize());
-    cuda_call( cudaMemcpy(a,datas,length*sizeof(int),cudaMemcpyDeviceToHost));
-    cudaFree(datas);
+    CUDA_CALL( cudaThreadSynchronize());
+    CUDA_CALL( cudaMemcpy(a,datas,length*sizeof(int),cudaMemcpyDeviceToHost));
+    CUDA_CALL( cudaFree(datas));
 
     for (int i=0;i<length;++i) cout<<a[i]<<" ";
 

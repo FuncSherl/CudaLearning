@@ -38,7 +38,7 @@ void cuda_call(cudaError_t a){
 int main(){
     CUDA_CALL(cudaSetDevice(0));
     //init
-    const int length=1025;
+    const int length=1024;
     int a[length], b[length];
     for (int i=0;i<length;++i){
         a[i]=1;

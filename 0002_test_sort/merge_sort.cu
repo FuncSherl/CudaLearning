@@ -6,6 +6,19 @@
 // 用宏变长参数来实现
 #define CUDA_CALL(...) {cudaError_t _cuda_tep_set_not_repeat_a=(__VA_ARGS__);if (_cuda_tep_set_not_repeat_a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(_cuda_tep_set_not_repeat_a), _cuda_tep_set_not_repeat_a); cudaDeviceReset(); assert(0);} }
 
+__global__ void merge_sort(int *datas, int n){
+    int tid=blockDim.x*threadIdx.y+threadIdx.x;
+    extern __shared__ int shared[];
+    if (tid<n) shared[tid] = datas[tid];
+    __syncthreads();
+
+    for (int gap=2;gap<n*2;gap<<=1){
+        if (tid%gap==0){
+            
+        }
+    }
+}
+
 int main(){
     CUDA_CALL(cudaSetDevice(0));
     //init

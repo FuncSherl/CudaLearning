@@ -1,7 +1,7 @@
 /*
  * @Author: xh
  * @Date: 2020-05-30 15:04:22
- * @LastEditTime: 2020-06-09 22:54:29
+ * @LastEditTime: 2020-09-12 14:10:23
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: /workspaces/cuda/cuda_start/plus.cu
@@ -10,8 +10,13 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cassert>
 
 using namespace std;
+
+// 用宏变长参数来实现
+#define CUDA_CALL(...) {cudaError_t _cuda_tep_set_not_repeat_a=(__VA_ARGS__);if (_cuda_tep_set_not_repeat_a!=cudaSuccess){printf("\nCUDA ERROR: %s (err_num=%d)\n", cudaGetErrorString(_cuda_tep_set_not_repeat_a), _cuda_tep_set_not_repeat_a); cudaDeviceReset(); assert(0);} }
+
 
 __global__ void myplus(float a[], float b[], float c[], int n){
   int i = blockDim.x * blockIdx.x + threadIdx.x;

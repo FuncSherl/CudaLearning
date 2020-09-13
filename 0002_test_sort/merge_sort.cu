@@ -49,7 +49,7 @@ __global__ void merge_sort(int *datas, int n){
         __syncthreads();
     }
 
-    for (int i=0;i<n;++i) datas[i]=shared[i+ ((cnt+1)%2)*n];
+    datas[tid]=shared[tid+ ((cnt+1)%2)*n];
 }
 
 int main(){

@@ -11,7 +11,7 @@ all: $(EXECS)
 $(BUILD_DIR)/% : %.cu
 	@echo + CC $<
 	@mkdir -p $(BUILD_DIR)
-	$(CC) -o $@ $<
+	$(CC) -g -o $@ $<
 
 # Don't remove *.o files automatically
 # .SECONDARY: $(OBJS)

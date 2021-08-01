@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include <iomanip>
 
 using namespace std;
 
@@ -12,10 +13,10 @@ using namespace std;
 
 #define SHOW_MAT(a, m,n) \
 {\
-  cout<<"ShowMat: "<<#a<<endl;\
+  cout<<"\nShowMat: "<<#a<<endl;\
   for (int i=0;i<m;++i){\
     for (int j=0;j<n;++j){\
-      cout<<a[i*n+j]<<", ";\
+      cout<<setw(4)<<a[i*n+j];\
     }\
     cout<<endl;\
   }\
@@ -25,7 +26,7 @@ __global__ void matmult_v1(float *a, float *b, float *c, int m, int n, int k){//
 
   int idx = blockDim.x * blockIdx.x + threadIdx.x;
   int idy=blockIdx.y*blockDim.y+threadIdx.y;
-  int index=gridDim.x*blockDim.x*idy+idx;
+  int index=idy*n+idx;
   if (idx>=n || idy>=m) return;
   
   c[index]=0;
@@ -35,13 +36,34 @@ __global__ void matmult_v1(float *a, float *b, float *c, int m, int n, int k){//
 }
 
 int main(){
-  int m=4;
-  int n=5;
-  int k=3;
+  //获取设备属性
+	cudaDeviceProp prop;
+	int deviceID;
+	cudaGetDevice(&deviceID);
+	cudaGetDeviceProperties(&prop, deviceID);
+ 
+	//检查设备是否支持重叠功能
+	if (!prop.deviceOverlap)
+	{
+		printf("No device will handle overlaps. so no speed up from stream.\n");
+		return 0;
+	}
+
+  //启动计时器
+	cudaEvent_t start, stop;
+	float elapsedTime;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	cudaEventRecord(start, 0);
+
+
+  int m=128;
+  int n=64;
+  int k=1024;
 
   float *A=new float[m*k]{1,2,3,4,5,6,7,8,9,10,11};
   float *B=new float[k*n]{1,0,1,0,1,0,0,1,1,0,1,1,0};
-  float *C=new float[m*n]{0};
+  float *C=new float[m*n];
 
   float *ga, *gb, *gc;
   // GPU端分配内存
@@ -56,7 +78,7 @@ int main(){
 
   // 定义kernel执行配置，（1024*1024/512）个block，每个block里面有512个线程
   dim3 dimBlock(2,3);
-  dim3 dimGrid(2,2);
+  dim3 dimGrid(3,2);
 
   // 执行kernel
   matmult_v1<<<dimGrid, dimBlock>>>(ga, gb, gc, m,n,k);

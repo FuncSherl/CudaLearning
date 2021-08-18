@@ -57,9 +57,9 @@ int main(){
 	cudaEventRecord(start, 0);
 
 
-  int m=128;
-  int n=64;
-  int k=1024;
+  int m=28;
+  int n=34;
+  int k=24;
 
   float *A=new float[m*k]{1,2,3,4,5,6,7,8,9,10,11};
   float *B=new float[k*n]{1,0,1,0,1,0,0,1,1,0,1,1,0};

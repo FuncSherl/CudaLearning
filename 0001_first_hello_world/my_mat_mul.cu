@@ -13,15 +13,38 @@ using namespace std;
 
 #define SHOW_MAT(a, m,n) \
 {\
-  cout<<"\nShowMat: "<<#a<<endl;\
+  cout<<"\nShowMat: "<<#a<<" -> "<<m<<"*"<<n<<endl;\
   for (int i=0;i<m;++i){\
     for (int j=0;j<n;++j){\
-      cout<<setw(4)<<a[i*n+j];\
+      cout<<setw(6)<<a[i*n+j];\
     }\
     cout<<endl;\
   }\
 }
 
+#define SET_MAT(a,d, m, n)\
+{\
+  cout<<"\nsetmat: "<<#a<<" -> "<<d<<endl;\
+  for (int i=0;i<m;++i){\
+    for (int j=0;j<n;++j){\
+      a[i*n+j]=d;\
+    }\
+  }\
+}
+
+#define SET_MATAUTO(a, m, n)\
+{\
+  cout<<"\nsetmat: "<<#a<<endl;\
+  for (int i=0;i<m;++i){\
+    for (int j=0;j<n;++j){\
+      a[i*n+j]=i*n+j;\
+    }\
+  }\
+}
+
+#define MDIV(a,b) ((int)a%(int)b==0?(int)a/(int)b:(int)a/(int)b+1)
+
+template<int BSIZE>
 __global__ void matmult_v1(float *a, float *b, float *c, int m, int n, int k){//a-> m*k  b->k*n
 
   int idx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -33,6 +56,36 @@ __global__ void matmult_v1(float *a, float *b, float *c, int m, int n, int k){//
   for (int i=0;i<k;++i){
     c[index]+=a[idy*k+i]*b[idx+i*n];
   }
+}
+
+template<int BSIZE>
+__global__ void matmult_v2(float *a, float *b, float*c, int m, int n, int k){
+  int tx=threadIdx.x;
+  int ty=threadIdx.y;
+
+  int btx=blockIdx.x*blockDim.x+tx;
+  int bty=blockIdx.y*blockDim.y+ty;
+  
+	//if(btx>=n || bty>=m) return;
+
+  float res=0;
+ 
+  for (int i=0;i<k;i+=BSIZE){
+    __shared__ float skepiA[BSIZE][BSIZE];
+    __shared__ float skepiB[BSIZE][BSIZE];
+    skepiA[ty][tx]=(bty>=m?0:a[bty*k+i+tx]);
+    skepiB[ty][tx]=(btx>=n?0:b[(i+ty)*n+btx]);
+
+    __syncthreads();
+    
+    for (int j=0; j<BSIZE && j+i<k; ++j){
+
+      res+=skepiA[ty][j]*skepiB[j][tx];
+    }
+		__syncthreads();
+  }
+  //__syncthread();
+  c[bty*n+btx]=res;
 }
 
 int main(){
@@ -54,16 +107,18 @@ int main(){
 	float elapsedTime;
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
-	cudaEventRecord(start, 0);
 
 
-  int m=28;
-  int n=34;
-  int k=24;
+  int m=18;
+  int n=24;
+  int k=14;
+	const int BSIZE=4;
 
-  float *A=new float[m*k]{1,2,3,4,5,6,7,8,9,10,11};
-  float *B=new float[k*n]{1,0,1,0,1,0,0,1,1,0,1,1,0};
+  float *A=new float[m*k];//{1,2,3,4,5,6,7,8,9,10,11};
+  float *B=new float[k*n];//{1,0,1,0,1,0,0,1,1,0,1,1,0};
   float *C=new float[m*n];
+	SET_MAT(A, 1, m, k);
+	SET_MATAUTO(B, k, n);
 
   float *ga, *gb, *gc;
   // GPU端分配内存
@@ -77,13 +132,24 @@ int main(){
   //cudaMemcpy(gc, C, size, cudaMemcpyHostToDevice);
 
   // 定义kernel执行配置，（1024*1024/512）个block，每个block里面有512个线程
-  dim3 dimBlock(2,3);
-  dim3 dimGrid(3,2);
-
+  dim3 dimBlock(BSIZE,BSIZE);
+  dim3 dimGrid(MDIV(n,BSIZE),MDIV(m,BSIZE));
+  cout<<"start block num: "<<dimGrid.x<<"*"<<dimGrid.y<<endl;
+	cout<<"each block:"<<dimBlock.x<<"*"<<dimBlock.y<<endl;
   // 执行kernel
-  matmult_v1<<<dimGrid, dimBlock>>>(ga, gb, gc, m,n,k);
-  CUDA_LAST_ERROR();
-
+	CUDA_CALL(cudaEventRecord(start));
+  int iter=1000*2;
+	for (int i=0;i<iter;++i){
+		matmult_v2<BSIZE><<<dimGrid, dimBlock>>>(ga, gb, gc, m,n,k);
+		//matmult_v1<BSIZE><<<dimGrid, dimBlock>>>(ga, gb, gc, m,n,k);
+	}
+	CUDA_LAST_ERROR();
+	
+	CUDA_CALL(cudaEventRecord(stop));
+  
+  CUDA_CALL(cudaEventSynchronize(stop));
+	CUDA_CALL(cudaEventElapsedTime(&elapsedTime, start, stop));
+	
   //cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
   cudaMemcpy(C, gc, m*n*sizeof(float), cudaMemcpyDeviceToHost);
 
@@ -94,7 +160,7 @@ int main(){
   SHOW_MAT(A,m,k);
   SHOW_MAT(B,k,n);
   SHOW_MAT(C,m,n);
-
+	cout<<"Iter:"<<iter<<" UsedTime: "<<elapsedTime<<" ms"<<endl;
   delete []A;
   delete []B;
   delete []C;

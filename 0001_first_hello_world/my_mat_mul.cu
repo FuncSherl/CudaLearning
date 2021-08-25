@@ -78,6 +78,7 @@ __global__ void matmult_v2(float *a, float *b, float*c, int m, int n, int k){
 
     __syncthreads();
     
+#pragma unroll
     for (int j=0; j<BSIZE && j+i<k; ++j){
 
       res+=skepiA[ty][j]*skepiB[j][tx];

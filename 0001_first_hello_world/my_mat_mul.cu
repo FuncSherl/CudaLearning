@@ -154,17 +154,18 @@ int main(){
   //cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
   cudaMemcpy(C, gc, m*n*sizeof(float), cudaMemcpyDeviceToHost);
 
-  cudaFree(ga);
-  cudaFree(gb);
-  cudaFree(gc);
+  CUDA_CALL(cudaFree(ga));
+  CUDA_CALL(cudaFree(gb));
+  CUDA_CALL(cudaFree(gc));
 
   SHOW_MAT(A,m,k);
   SHOW_MAT(B,k,n);
   SHOW_MAT(C,m,n);
 	cout<<"Iter:"<<iter<<" UsedTime: "<<elapsedTime<<" ms"<<endl;
-  delete []A;
-  delete []B;
-  delete []C;
-
+	delete []A;
+	delete []B;
+	delete []C;
+  CUDA_CALL(cudaEventDestroy(start));
+  CUDA_CALL(cudaEventDestroy(stop));
   return 0;
 }

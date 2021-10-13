@@ -118,8 +118,14 @@ int main(int argc, char *argv[]){
 	imwrite("ori_"+sample_img, ori);
 
 	cout<<"boxes before: "<<boxes.size()<<endl;
+	sort(boxes.begin(), boxes.end(), [](auto &a, auto &b){
+		return a[4]>b[4];
+	});
 	nms(boxes, StrtoNum<float>(string(argv[1])));
 	cout<<"boxes after: "<<boxes.size()<<endl;
+	for (auto i: boxes){
+		cout<<"Addbox: "<<i[4]<<endl;
+	}
 
 	fun_draw(boxes, aft);
 	imwrite("aft_"+sample_img, aft);

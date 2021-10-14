@@ -44,7 +44,7 @@ T StrtoNum(const string & s){
 
 const int blocksize=sizeof(int)*8;
 
-__device__ float iou(const float* a, const float*b){
+__device__ inline float iou(const float* a, const float*b){
 	float iou_x1=max(a[0], b[0]);
 	float iou_y1=max(a[1], b[1]);
 	float iou_x2=min(a[2], b[2]);
@@ -67,6 +67,8 @@ __global__ void nms(float *boxes, unsigned int *mask, int boxnum, float thresh){
 
 	float* curbox=boxes+(row_start*blocksize+threadIdx.x)*5;
 	int blocknum=DIVUP(boxnum,blocksize);
+	__shared__ float block_boxes[blocksize * 5];
+
 	if (threadIdx.x<y_threads){
 		unsigned int tep=0;
 		for (int i=0;i<x_threads;++i){

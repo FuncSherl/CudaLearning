@@ -118,7 +118,7 @@ int main(int argc, char *argv[]){
 	fun_draw(boxes, ori);
 	imwrite("ori_"+sample_img, ori);
 	
-	for(int i=0;i< StrtoNum<int>(string(argv[1]));++i){
+	for(int i=0;i< StrtoNum<int>(string(argv[2]));++i){
 		boxes.push_back(boxes[i]);
 	}
 	cout<<"boxes before: "<<boxes.size()<<endl;

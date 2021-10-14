@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <cassert>
 #include <bitset>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
@@ -68,19 +69,27 @@ __global__ void nms(float *boxes, unsigned int *mask, int boxnum, float thresh){
 	float* curbox=boxes+(row_start*blocksize+threadIdx.x)*5;
 	int blocknum=DIVUP(boxnum,blocksize);
 	__shared__ float block_boxes[blocksize * 5];
+	if (threadIdx.x<x_threads){
+		block_boxes[threadIdx.x*5+0]=boxes[(col_start*blocksize+ threadIdx.x)*5+0];
+		block_boxes[threadIdx.x*5+1]=boxes[(col_start*blocksize+ threadIdx.x)*5+1];
+		block_boxes[threadIdx.x*5+2]=boxes[(col_start*blocksize+ threadIdx.x)*5+2];
+		block_boxes[threadIdx.x*5+3]=boxes[(col_start*blocksize+ threadIdx.x)*5+3];
+		block_boxes[threadIdx.x*5+4]=boxes[(col_start*blocksize+ threadIdx.x)*5+4];
+	}
+	__syncthreads();
 
 	if (threadIdx.x<y_threads){
 		unsigned int tep=0;
 		for (int i=0;i<x_threads;++i){
-			float* anobox=boxes+(col_start*blocksize+i)*5;
+			float* anobox=&block_boxes[i*5]; //boxes+(col_start*blocksize+i)*5;
 			
 			if(iou(curbox, anobox)>thresh){
-				printf ("box %d and %d iou: %f\n",row_start*blocksize+threadIdx.x, col_start*blocksize+i, iou(curbox, anobox));
+				//printf ("box %d and %d iou: %f\n",row_start*blocksize+threadIdx.x, col_start*blocksize+i, iou(curbox, anobox));
 				tep|=(1U<<i);
 			}
 		}
 		mask[blocknum*(row_start*blocksize+threadIdx.x)+col_start]=tep;
-		printf("Mask %d = %x\n",blocknum*(row_start*blocksize+threadIdx.x)+col_start, tep);
+		//printf("Mask %d = %x\n",blocknum*(row_start*blocksize+threadIdx.x)+col_start, tep);
 	}
 }	
 
@@ -130,8 +139,14 @@ int main(int argc, char *argv[]){
 	fun_draw(boxes, ori);
 	imwrite("ori_gpu_"+sample_img, ori);
 
+	for(int i=0;i< StrtoNum<int>(string(argv[1]));++i){
+		boxes.push_back(boxes[i]);
+	}
+
 	cout<<"boxes before: "<<boxes.size()<<endl;
 
+	auto beginTime = std::chrono::high_resolution_clock::now();
+	
 	sort(boxes.begin(), boxes.end(), [](auto &a, auto &b){
 		return a[4]>b[4];
 	});
@@ -162,9 +177,9 @@ int main(int argc, char *argv[]){
                         mask_dev,
                         boxes.size()*blocknum*sizeof(unsigned int),
                         cudaMemcpyDeviceToHost));
-	for (auto i: mask_host){
-		cout<<bitset<32>(i)<<endl;
-	}
+	// for (auto i: mask_host){
+	// 	cout<<bitset<32>(i)<<endl;
+	// }
 	
 	std::vector<unsigned int> blacklist(blocknum, 0);
 
@@ -178,14 +193,17 @@ int main(int argc, char *argv[]){
 		//cout<<"debug2:"<<i<<" "<<block_ind<< " "<< blacklist.size() <<endl;
 		if(blacklist[block_ind] & (1U<<thread_ind)) continue;
 		
-		cout<<"Add box: "<<i<< " "<< boxes[i][4] <<endl;
+		//cout<<"Add box: "<<i<< " "<< boxes[i][4] <<endl;
 		boxes_swap.push_back(boxes[i]);
 
 		for (int j=block_ind; j<blocknum;++j)  blacklist[j]|=mask_host[blocknum*i+j];
 	}
 	boxes_swap.swap(boxes);
+	auto endTime = std::chrono::high_resolution_clock::now();
+	auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime-beginTime);
+	double programTimes = ((double) elapsedTime.count());
 	
-	cout<<"boxes after: "<<boxes.size()<<endl;
+	cout<<"boxes after: "<<boxes.size()<<" Time: "<<programTimes<<endl;
 
 	fun_draw(boxes, aft);
 	imwrite("aft_gpu_"+sample_img, aft);

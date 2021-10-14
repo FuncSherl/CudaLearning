@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <set>
 #include <opencv2/opencv.hpp>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
@@ -76,8 +77,8 @@ const vector<Scalar> COLORS={Scalar(255,0,0), Scalar(0,255,0), Scalar(0,0,255), 
 
 
 int main(int argc, char *argv[]){
-	if(argc<2){
-		cout<<"Usage: command thresh"<<endl;
+	if(argc<3){
+		cout<<"Usage: command thresh addbox"<<endl;
 		exit(1);
 	}
 	ifstream readf(boxfile);
@@ -116,13 +117,17 @@ int main(int argc, char *argv[]){
 	};
 	fun_draw(boxes, ori);
 	imwrite("ori_"+sample_img, ori);
-
+	
+	for(int i=0;i< StrtoNum<int>(string(argv[1]));++i){
+		boxes.push_back(boxes[i]);
+	}
 	cout<<"boxes before: "<<boxes.size()<<endl;
-	sort(boxes.begin(), boxes.end(), [](auto &a, auto &b){
-		return a[4]>b[4];
-	});
+	auto beginTime = std::chrono::high_resolution_clock::now();
 	nms(boxes, StrtoNum<float>(string(argv[1])));
-	cout<<"boxes after: "<<boxes.size()<<endl;
+	auto endTime = std::chrono::high_resolution_clock::now();
+	auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime-beginTime);
+	double programTimes = ((double) elapsedTime.count());
+	cout<<"boxes after: "<<boxes.size()<<" Time: "<<programTimes<<endl;
 	for (auto i: boxes){
 		cout<<"Addbox: "<<i[4]<<endl;
 	}

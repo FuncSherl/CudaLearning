@@ -20,7 +20,7 @@ using namespace std;
 
 const int imgsize=1024;
 const string sample_img="nms_gpu.jpg";
-const string boxfile="./boxes.txt";//x1, y1, x2, y2, score 
+const string boxfile="/home/sherl/Workspaces/Git/CudaLearning/0003_test_nms/boxes.txt";//x1, y1, x2, y2, score 
 const int eachboxlen=5;
 
 
@@ -136,8 +136,8 @@ int main(int argc, char *argv[]){
 			++cnt;
 		}
 	};
-	fun_draw(boxes, ori);
-	imwrite("ori_gpu_"+sample_img, ori);
+	//fun_draw(boxes, ori);
+	//imwrite("ori_gpu_"+sample_img, ori);
 
 	for(int i=0;i< StrtoNum<int>(string(argv[2]));++i){
 		boxes.push_back(boxes[i]);
@@ -205,8 +205,8 @@ int main(int argc, char *argv[]){
 	
 	cout<<"boxes after: "<<boxes.size()<<" Time: "<<programTimes<<endl;
 
-	fun_draw(boxes, aft);
-	imwrite("aft_gpu_"+sample_img, aft);
+	//fun_draw(boxes, aft);
+	//imwrite("aft_gpu_"+sample_img, aft);
 
 	return 0;
 }

@@ -37,3 +37,5 @@ build/
 obj/
 *.jpg
 *.png
+
+CUDA_Samples/

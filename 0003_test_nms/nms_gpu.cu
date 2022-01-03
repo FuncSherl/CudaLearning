@@ -200,10 +200,10 @@ int main(int argc, char *argv[]){
 	}
 	boxes_swap.swap(boxes);
 	auto endTime = std::chrono::high_resolution_clock::now();
-	auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime-beginTime);
+	auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime-beginTime);
 	double programTimes = ((double) elapsedTime.count());
 	
-	cout<<"boxes after: "<<boxes.size()<<" Time: "<<programTimes<<endl;
+	cout<<"boxes after: "<<boxes.size()<<" Time: "<<programTimes<<" ms"<<endl;
 
 	//fun_draw(boxes, aft);
 	//imwrite("aft_gpu_"+sample_img, aft);

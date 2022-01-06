@@ -39,3 +39,4 @@ obj/
 *.png
 
 CUDA_Samples/
+CUDASamples/

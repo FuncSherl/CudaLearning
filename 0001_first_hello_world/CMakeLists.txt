@@ -12,6 +12,14 @@ endif()
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 # set(CMAKE_CXX_STANDARD 11)
 # SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};) # -gencode arch=compute_61,code=sm_61;
+
+#两种包含路径的不同：
+#include_directories：
+#当前CMakeList.txt中的所有目标以及所有在其调用点之后添加的子目录中的所有目标将具有此头文件搜索路径，如果有不同目录相同名称的头文件会产生影响，
+#所以这里建议针对特定的target进行添加头文件的操作，不要使用include_directories
+#target_include_directories：
+#指定目标包含的头文件路径
+
 #// 头文件路径
 INCLUDE_DIRECTORIES(
     ${PROJECT_SOURCE_DIR}/include

@@ -1,10 +1,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
 #// 项目名称， 新版cmake不推荐使用FindCuda这个宏，取代的是在project的LANGUAGES加载cuda或者enable_language(CUDA),后续就同cpp一样使用cu文件就行了
 project(helloworld LANGUAGES CUDA)
-
+enable_language(CUDA)
 # 指定cuda的compute architectures，主要是用于编译电脑的显卡比需要部署的显卡更好的时候，如果采用默认的计算架构的话，在上代GPU上会无法运行
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 60)
+  set(CMAKE_CUDA_ARCHITECTURES 61)
 endif()
 
 #// C++和CUDA的编译参数

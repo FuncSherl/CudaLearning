@@ -30,3 +30,7 @@ INCLUDE_DIRECTORIES(
 # add the executable
 add_executable(hello hello.cu)
 add_executable(clock clock.cu)
+add_executable(my_mat_mul my_mat_mul.cu)
+add_executable(plus plus.cu)
+add_executable(show_block_idx show_block_idx.cu)
+add_executable(show_device show_device.cu)

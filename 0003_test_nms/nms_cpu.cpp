@@ -12,7 +12,6 @@ using namespace std;
 
 const int imgsize = 1024;
 const string sample_img = "nms_cpu.jpg";
-const string boxfile = "./boxes.txt";  // x1, y1, x2, y2, score
 
 void split(const string &str, vector<string> &ret, const string delim = " ") {
   auto firpos = str.find_first_not_of(delim, 0);
@@ -81,11 +80,11 @@ const vector<Scalar> COLORS = {Scalar(255, 0, 0),
                                Scalar(125, 0, 255)};
 
 int main(int argc, char *argv[]) {
-  if (argc < 3) {
-    cout << "Usage: command thresh addbox" << endl;
+  if (argc < 4) {
+    cout << "Usage: command boxfilepath thresh addbox" << endl;
     exit(1);
   }
-  ifstream readf(boxfile);
+  ifstream readf(argv[1]);
   string lin;
   vector<vector<float>> boxes;  // each row is : x1, y1, x2,y2,score
   while (getline(readf, lin)) {
@@ -121,12 +120,14 @@ int main(int argc, char *argv[]) {
   fun_draw(boxes, ori);
   imwrite("ori_" + sample_img, ori);
 
-  for (int i = 0; i < StrtoNum<int>(string(argv[2])); ++i) {
+  assert(!boxes.empty());
+
+  for (int i = 0; i < StrtoNum<int>(string(argv[3])); ++i) {
     boxes.push_back(boxes[i]);
   }
   cout << "boxes before: " << boxes.size() << endl;
   auto beginTime = std::chrono::high_resolution_clock::now();
-  nms(boxes, StrtoNum<float>(string(argv[1])));
+  nms(boxes, StrtoNum<float>(string(argv[2])));
   auto endTime = std::chrono::high_resolution_clock::now();
   auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - beginTime);
   double programTimes = ((double)elapsedTime.count());

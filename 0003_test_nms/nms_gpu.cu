@@ -18,8 +18,6 @@ using namespace std;
 
 const int imgsize = 1024;
 const string sample_img = "nms_gpu.jpg";
-const string boxfile = "/home/sherl/Workspaces/Git/CudaLearning/0003_test_nms/boxes.txt";  // x1, y1, x2, y2, score
-const int eachboxlen = 5;
 
 void split(const string &str, vector<string> &ret, const string delim = " ") {
   auto firpos = str.find_first_not_of(delim, 0);
@@ -105,11 +103,11 @@ const vector<Scalar> COLORS = {Scalar(255, 0, 0),
                                Scalar(125, 0, 255)};
 
 int main(int argc, char *argv[]) {
-  if (argc < 3) {
-    cout << "Usage: command thresh addboxnum" << endl;
+  if (argc < 4) {
+    cout << "Usage: command boxfilepath thresh addboxnum" << endl;
     exit(1);
   }
-  ifstream readf(boxfile);
+  ifstream readf(argv[1]);
   string lin;
   vector<vector<float>> boxes;  // each row is : x1, y1, x2,y2,score
   while (getline(readf, lin)) {
@@ -128,24 +126,26 @@ int main(int argc, char *argv[]) {
   cv::Mat ori(imgsize, imgsize, CV_8UC3, Scalar(cv::uint8_t(255), cv::uint8_t(255), cv::uint8_t(255)));
   cv::Mat aft(imgsize, imgsize, CV_8UC3, Scalar(cv::uint8_t(255), cv::uint8_t(255), cv::uint8_t(255)));
 
-  auto fun_draw = [](const vector<vector<float>> &boxes, Mat &img) {
-    int cnt = 0;
-    for (auto &b : boxes) {
-      int x1 = b[0];
-      int y1 = b[1];
-      int x2 = b[2];
-      int y2 = b[3];
-      float score = b[4];
+  //   auto fun_draw = [](const vector<vector<float>> &boxes, Mat &img) {
+  //     int cnt = 0;
+  //     for (auto &b : boxes) {
+  //       int x1 = b[0];
+  //       int y1 = b[1];
+  //       int x2 = b[2];
+  //       int y2 = b[3];
+  //       float score = b[4];
 
-      rectangle(img, Point(x1, y1), Point(x2, y2), COLORS[cnt % COLORS.size()]);
-      putText(img, to_string(score), Point(x1, y1 - 4), cv::FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0, 0, 255));
-      ++cnt;
-    }
-  };
+  //       rectangle(img, Point(x1, y1), Point(x2, y2), COLORS[cnt % COLORS.size()]);
+  //       putText(img, to_string(score), Point(x1, y1 - 4), cv::FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0, 0, 255));
+  //       ++cnt;
+  //     }
+  //   };
   // fun_draw(boxes, ori);
   // imwrite("ori_gpu_"+sample_img, ori);
 
-  for (int i = 0; i < StrtoNum<int>(string(argv[2])); ++i) {
+  assert(!boxes.empty());
+
+  for (int i = 0; i < StrtoNum<int>(string(argv[3])); ++i) {
     boxes.push_back(boxes[i]);
   }
 
@@ -155,6 +155,8 @@ int main(int argc, char *argv[]) {
 
   sort(boxes.begin(), boxes.end(), [](auto &a, auto &b) { return a[4] > b[4]; });
   int blocknum = DIVUP(boxes.size(), blocksize);
+
+  cout << "blocknum:" << blocknum << endl;
 
   dim3 blocks(blocknum, blocknum);
   dim3 threads(blocksize);
@@ -171,7 +173,8 @@ int main(int argc, char *argv[]) {
 
   CUDA_CALL(cudaMemcpy(dev_boxes, &host_boxes[0], boxes.size() * 5 * sizeof(float), cudaMemcpyHostToDevice));
 
-  nms<<<blocks, threads>>>(dev_boxes, mask_dev, boxes.size(), StrtoNum<float>(string(argv[1])));
+  nms<<<blocks, threads>>>(dev_boxes, mask_dev, boxes.size(), StrtoNum<float>(string(argv[2])));
+  CUDA_LAST_ERROR();
 
   std::vector<unsigned int> mask_host(boxes.size() * blocknum);
   CUDA_CALL(

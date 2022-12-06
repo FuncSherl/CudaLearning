@@ -102,10 +102,10 @@ int main() {
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  int m = 18;
-  int n = 24;
-  int k = 14;
-  const int BSIZE = 4;
+  int m = 1800;
+  int n = 2400;
+  int k = 1400;
+  const int BSIZE = 5;
 
   float *A = new float[m * k];  //{1,2,3,4,5,6,7,8,9,10,11};
   float *B = new float[k * n];  //{1,0,1,0,1,0,0,1,1,0,1,1,0};
@@ -131,7 +131,7 @@ int main() {
   cout << "each block:" << dimBlock.x << "*" << dimBlock.y << endl;
   // 执行kernel
   CUDA_CALL(cudaEventRecord(start));
-  int iter = 1000 * 2;
+  int iter = 10 * 2;
   for (int i = 0; i < iter; ++i) {
     matmult_v2<BSIZE><<<dimGrid, dimBlock>>>(ga, gb, gc, m, n, k);
     // matmult_v1<BSIZE><<<dimGrid, dimBlock>>>(ga, gb, gc, m,n,k);

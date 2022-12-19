@@ -1,56 +1,35 @@
+#include <iostream>
 #include "commontools.h"
+
+using namespace std;
 
 // cudaError_t addWithCuda(int *c, const int *a, const int *b, size_t size);
 
 __global__ void addKernel(int *c, const int *a, const int *b) {
   int i = threadIdx.x;
-  c[i] = a[i] + b[i];
+  if (i<5) c[i] = a[i] + b[i];
 }
 
 // Helper function for using CUDA to add vectors in parallel.
-cudaError_t addWithCuda(int *c, const int *a, const int *b, size_t size) {
+bool addWithCuda(int *c, const int *a, const int *b, size_t size) {
   int *dev_a = 0;
   int *dev_b = 0;
   int *dev_c = 0;
 
-  cudaError_t cudaStatus;
   // Choose which GPU to run on, change this on a multi-GPU system.
-  cudaStatus = cudaSetDevice(0);
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaSetDevice failed! Do you have a CUDA-capable GPU installed?");
-    goto Error;
-  }
+  CUDA_CALL(cudaSetDevice(0));
+
   // Allocate GPU buffers for three vectors (two input, one output) .
-  cudaStatus = cudaMalloc((void **)&dev_c, size * sizeof(int));
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaMalloc failed!");
-    goto Error;
-  }
-  cudaStatus = cudaMalloc((void **)&dev_a, size * sizeof(int));
+  CUDA_CALL(cudaMalloc((void **)&dev_c, size * sizeof(int)));
 
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaMalloc failed!");
-    goto Error;
-  }
-  cudaStatus = cudaMalloc((void **)&dev_b, size * sizeof(int));
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaMalloc failed!");
-    goto Error;
-  }
+  CUDA_CALL(cudaMalloc((void **)&dev_a, size * sizeof(int)));
+
+  CUDA_CALL(cudaMalloc((void **)&dev_b, size * sizeof(int)));
+
   // Copy input vectors from host memory to GPU buffers.
-  cudaStatus = cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
+  CUDA_CALL(cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice));
 
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaMemcpy failed!");
-    goto Error;
-  }
-
-  cudaStatus = cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
-
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaMemcpy failed!");
-    goto Error;
-  }
+  CUDA_CALL(cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice));
 
   // Launch a kernel on the GPU with one thread for each element.
   addKernel<<<1, size>>>(dev_c, dev_a, dev_b);
@@ -58,42 +37,27 @@ cudaError_t addWithCuda(int *c, const int *a, const int *b, size_t size) {
   // cudaThreadSynchronize waits for the kernel to finish, and returns
   // any errors encountered during the launch.
   // cudaThreadSynchronize()在cuda10.0以后被弃用了，可以用 cudaDeviceSynchronize() 来代替
-  cudaStatus = cudaDeviceSynchronize();
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr,
-            "cudaThreadSynchronize returned error code %d after launching "
-            "addKernel!\n",
-            cudaStatus);
-    goto Error;
-  }
+  CUDA_CALL(cudaDeviceSynchronize());
   // Copy output vector from GPU buffer to host memory.
-  cudaStatus = cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost);
-
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaMemcpy failed!");
-    goto Error;
-  }
+  CUDA_CALL(cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost));
 
 Error:
   cudaFree(dev_c);
   cudaFree(dev_a);
   cudaFree(dev_b);
 
-  return cudaStatus;
+  return true;
 }
 
 int main() {
-  const int arraySize = 5;
-  const int a[arraySize] = {1, 2, 3, 4, 5};
-  const int b[arraySize] = {10, 20, 30, 40, 50};
-  int c[arraySize] = {0};
+  const int arraySize = 1<<20;
+  const int a[5] = {1, 2, 3, 4, 5};
+  const int b[5] = {10, 20, 30, 40, 50};
+  int c[5] = {0};
   // Add vectors in parallel.
-  cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
+  addWithCuda(c, a, b, arraySize);
 
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "addWithCuda failed!");
-    return 1;
-  }
+  cout << "length: " << arraySize << endl;
   printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n", c[0], c[1], c[2], c[3], c[4]);
 
   // cudaThreadExit must be called before exiting in order for profiling and
@@ -102,10 +66,7 @@ int main() {
   // Note that this function is deprecated because its name does not reflect its behavior.
   // Its functionality is identical to the non-deprecated function cudaDeviceReset(), which should be used instead.
   // cudaStatus = cudaThreadExit();
-  cudaStatus = cudaDeviceReset();
-  if (cudaStatus != cudaSuccess) {
-    fprintf(stderr, "cudaThreadExit failed!");
-    return 1;
-  }
+  CUDA_CALL(cudaDeviceReset());
+
   return 0;
 }

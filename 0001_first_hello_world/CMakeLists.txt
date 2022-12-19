@@ -9,7 +9,7 @@ endif()
 
 #// C++和CUDA的编译参数
 # The easiest way to enable support for a specific C++ standard in CMake is by using the CMAKE_CXX_STANDARD variable
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g")
 # set(CMAKE_CXX_STANDARD 11)
 # SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};) # -gencode arch=compute_61,code=sm_61;
 
@@ -34,3 +34,4 @@ add_executable(my_mat_mul my_mat_mul.cu)
 add_executable(plus plus.cu)
 add_executable(show_block_idx show_block_idx.cu)
 add_executable(show_device show_device.cu)
+add_executable(my_mat_trans my_mat_trans.cu)

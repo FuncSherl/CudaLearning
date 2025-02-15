@@ -9,7 +9,7 @@ EXECS=$(patsubst %.cu,$(BUILD_DIR)/%,$(SOURCE))
 all: $(EXECS)
 
 $(BUILD_DIR)/% : %.cu
-	@echo + CC $<
+	@echo + $(CC) $<
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -g -o $@ $<
 

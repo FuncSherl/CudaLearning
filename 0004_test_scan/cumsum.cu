@@ -58,9 +58,9 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
     CUDA_CALL(cudaDeviceSynchronize());
     clock_t end_kernel = clock();
     double elapsed_time_kernel =
-        double(end_kernel - start_kernel) / CLOCKS_PER_SEC;
+        double(end_kernel - start_kernel) * 1000.0 / CLOCKS_PER_SEC;
     std::cout << "Kernel cumsumBelloch execution time: " << elapsed_time_kernel
-              << " seconds" << std::endl;
+              << " milliseconds" << std::endl;
 
     CUDA_CALL(cudaMemcpy(h_out, d_out, size, cudaMemcpyDeviceToHost));
 
@@ -112,9 +112,9 @@ void cumsumNaive(const T *h_in, T *h_out, int m, int n) {
     CUDA_CALL(cudaDeviceSynchronize());
     clock_t end_kernel = clock();
     double elapsed_time_kernel =
-        double(end_kernel - start_kernel) / CLOCKS_PER_SEC;
+        double(end_kernel - start_kernel) * 1000.0 / CLOCKS_PER_SEC;
     std::cout << "Kernel cumsumNaive execution time: " << elapsed_time_kernel
-              << " seconds" << std::endl;
+              << " milliseconds" << std::endl;
 
     CUDA_CALL(cudaMemcpy(h_out, d_out, size, cudaMemcpyDeviceToHost));
 
@@ -131,10 +131,11 @@ void cumsumSingle(const int *h_in, int *h_out, int m, int n) {
         }
     }
     clock_t end = clock();
-    double elapsed_time = double(end - start) / CLOCKS_PER_SEC;
-    std::cout << "Single cumsum execution time: " << elapsed_time << " seconds"
-              << std::endl;
+    double elapsed_time = double(end - start) * 1000.0 / CLOCKS_PER_SEC;
+    std::cout << "Single cumsum execution time: " << elapsed_time
+              << " milliseconds" << std::endl;
 }
+
 bool checkDiff(const int *a, const int *b, int size) {
     for (int i = 0; i < size; i++) {
         if (a[i] != b[i]) {

@@ -4,7 +4,7 @@
 #include <ctime>
 #include <iostream>
 
-#include "common/commontools.h"
+#include "common/include/commontools.h"
 
 template <typename T>
 __global__ void cumsumBellochKernel(const T *d_in, T *d_out, int n) {

@@ -55,6 +55,7 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
     clock_t start_kernel = clock();
     cumsumBellochKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
         d_in, d_out, n);
+    CUDA_LAST_ERROR();
     CUDA_CALL(cudaDeviceSynchronize());
     clock_t end_kernel = clock();
     double elapsed_time_kernel =
@@ -109,6 +110,7 @@ void cumsumNaive(const T *h_in, T *h_out, int m, int n) {
     clock_t start_kernel = clock();
     cumsumNaiveKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
         d_in, d_out, n);
+    CUDA_LAST_ERROR();
     CUDA_CALL(cudaDeviceSynchronize());
     clock_t end_kernel = clock();
     double elapsed_time_kernel =
@@ -136,8 +138,8 @@ void cumsumSingle(const int *h_in, int *h_out, int m, int n) {
               << " milliseconds" << std::endl;
 }
 
-bool checkDiff(const int *a, const int *b, int size) {
-    for (int i = 0; i < size; i++) {
+bool checkDiff(const int *a, const int *b, long size) {
+    for (long i = 0; i < size; i++) {
         if (a[i] != b[i]) {
             std::cout << "Difference found at index " << i << ": " << a[i]
                       << " != " << b[i] << std::endl;
@@ -148,13 +150,18 @@ bool checkDiff(const int *a, const int *b, int size) {
     return true;
 }
 
-int main() {
-    const int m = 1024;
-    const int n = 1024;
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <m> <n>" << std::endl;
+        return 1;
+    }
+
+    const long m = std::stol(argv[1]);
+    const long n = std::stol(argv[2]);
 
     int *h_in = new int[m * n];
-    int *h_out_cpu = new int[m * n]();
-    int *h_out = new int[m * n]();
+    int *h_out_cpu = new int[m * n];
+    int *h_out = new int[m * n];
 
     srand(time(0));
 

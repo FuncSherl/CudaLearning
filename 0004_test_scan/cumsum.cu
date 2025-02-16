@@ -151,9 +151,9 @@ int main() {
     const int m = 1024;
     const int n = 1024;
 
-    int h_in[m * n];
-    int h_out_cpu[m * n] = {0};
-    int h_out[m * n] = {0};
+    int *h_in = new int[m * n];
+    int *h_out_cpu = new int[m * n]();
+    int *h_out = new int[m * n]();
 
     srand(time(0));
 
@@ -164,17 +164,26 @@ int main() {
         }
     }
 
+    std::cout << "Running single-threaded cumulative sum..." << std::endl;
     cumsumSingle(h_in, h_out_cpu, m, n);
 
-    // Naive parallel algorithm.
+    std::cout << "Running naive parallel cumulative sum..." << std::endl;
     cumsumNaive(h_in, h_out, m, n);
+    std::cout << "Checking results of naive parallel cumulative sum..."
+              << std::endl;
     checkDiff(h_out, h_out_cpu, m * n);
 
     std::fill(h_out, h_out + m * n, 0);
 
-    // Belloch algorithm.
+    std::cout << "Running Belloch parallel cumulative sum..." << std::endl;
     cumsumBelloch(h_in, h_out, m, n);
+    std::cout << "Checking results of Belloch parallel cumulative sum..."
+              << std::endl;
     checkDiff(h_out, h_out_cpu, m * n);
+
+    delete[] h_in;
+    delete[] h_out_cpu;
+    delete[] h_out;
 
     return 0;
 }

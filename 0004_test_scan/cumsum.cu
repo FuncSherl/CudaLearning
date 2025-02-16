@@ -6,11 +6,13 @@
 
 #include "common/include/commontools.h"
 
+#define THREAD_BLOCK_LIMIT 1024
+
 template <typename T>
 __global__ void cumsumBellochKernel(const T *d_in, T *d_out, int n) {
     extern __shared__ T temp[];
-    int tid = threadIdx.x;
-    int block_offset = blockIdx.x * n;
+    long tid = threadIdx.x + threadIdx.y * blockDim.x;
+    long block_offset = blockIdx.x * n;
 
     if (tid < n) {
         temp[tid] = d_in[block_offset + tid];
@@ -18,8 +20,8 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, int n) {
     __syncthreads();
 
     // Up-sweep phase (reduce)
-    for (int stride = 1; stride < n; stride *= 2) {
-        int index = (tid + 1) * stride * 2 - 1;
+    for (long stride = 1; stride < n; stride *= 2) {
+        long index = (tid + 1) * stride * 2 - 1;
         if (index < n) {
             temp[index] += temp[index - stride];
         }
@@ -27,8 +29,8 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, int n) {
     }
 
     // Down-sweep phase (down)
-    for (int stride = n / 4; stride > 0; stride /= 2) {
-        int index = (tid + 1) * stride * 2 - 1;
+    for (long stride = n / 4; stride > 0; stride /= 2) {
+        long index = (tid + 1) * stride * 2 - 1;
         if (index + stride < n) {
             temp[index + stride] += temp[index];
         }
@@ -50,7 +52,8 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
 
     CUDA_CALL(cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice));
 
-    dim3 threadsPerBlock(n);
+    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n),
+                         std::ceil(n * 1.0 / THREAD_BLOCK_LIMIT));
     dim3 blocksPerGrid(m);
     clock_t start_kernel = clock();
     cumsumBellochKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
@@ -72,21 +75,23 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
 template <typename T>
 __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
     extern __shared__ T temp[];
-    int tid = threadIdx.x;
-    int block_offset = blockIdx.x * n;
+    long tid = threadIdx.x + threadIdx.y * blockDim.x;
+    long block_offset = blockIdx.x * n;
 
     if (tid < n) {
         temp[tid] = d_in[block_offset + tid];
     }
     __syncthreads();
 
-    for (int stride = 1; stride < n; stride *= 2) {
+    for (long stride = 1; stride < n; stride *= 2) {
         T val = 0;
-        if (tid >= stride) {
+        if (tid >= stride && tid < n) {
             val = temp[tid - stride];
         }
         __syncthreads();
-        temp[tid] += val;
+        if (tid < n) {
+            temp[tid] += val;
+        }
         __syncthreads();
     }
 
@@ -105,7 +110,8 @@ void cumsumNaive(const T *h_in, T *h_out, int m, int n) {
 
     CUDA_CALL(cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice));
 
-    dim3 threadsPerBlock(n);
+    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n),
+                         std::ceil(n * 1.0 / THREAD_BLOCK_LIMIT));
     dim3 blocksPerGrid(m);
     clock_t start_kernel = clock();
     cumsumNaiveKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(

@@ -129,11 +129,12 @@ __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
 
         for (long j = 0; j < numPerThread; j++) {
             long index = tid * numPerThread + j;
-
-            if (index >= stride && index < n) {
-                tempW[index] = tempR[index] + tempR[index - stride];
-            } else {
-                tempW[index] = tempR[index];
+            if (index < n) {
+                if (index >= stride) {
+                    tempW[index] = tempR[index] + tempR[index - stride];
+                } else {
+                    tempW[index] = tempR[index];
+                }
             }
         }
         __syncthreads();
@@ -279,10 +280,10 @@ int main(int argc, char *argv[]) {
 
     const long m = std::stol(argv[1]);
     const long n = std::stol(argv[2]);
-    if ((n & (n - 1)) != 0) {
-        std::cerr << "Error: n must be a power of 2." << std::endl;
-        return 1;
-    }
+    // if ((n & (n - 1)) != 0) {
+    //     std::cerr << "Error: n must be a power of 2." << std::endl;
+    //     return 1;
+    // }
 
     char *h_in = new char[m * n];
     char *h_out_cpu = new char[m * n];

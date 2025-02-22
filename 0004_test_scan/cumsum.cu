@@ -8,6 +8,7 @@
 
 #define THREAD_BLOCK_LIMIT 1024
 
+// Cumsum with belloch parallelization
 template <typename T>
 __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     extern __shared__ T temp[];
@@ -91,8 +92,9 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
     clock_t end_kernel = clock();
     double elapsed_time_kernel =
         double(end_kernel - start_kernel) * 1000.0 / CLOCKS_PER_SEC;
-    std::cout << "Kernel cumsumBelloch execution time: " << elapsed_time_kernel
-              << " milliseconds" << std::endl;
+    std::cout << "Kernel cumsumBelloch execution time for m = " << m
+              << ", n = " << n << ": " << elapsed_time_kernel << " milliseconds"
+              << std::endl;
 
     CUDA_CALL(cudaMemcpy(h_out, d_out, size, cudaMemcpyDeviceToHost));
 
@@ -100,6 +102,7 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
     CUDA_CALL(cudaFree(d_out));
 }
 
+// Cumsum with navie parallelization
 template <typename T>
 __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
     extern __shared__ T temp[];
@@ -165,8 +168,9 @@ void cumsumNaive(const T *h_in, T *h_out, int m, int n) {
     clock_t end_kernel = clock();
     double elapsed_time_kernel =
         double(end_kernel - start_kernel) * 1000.0 / CLOCKS_PER_SEC;
-    std::cout << "Kernel cumsumNaive execution time: " << elapsed_time_kernel
-              << " milliseconds" << std::endl;
+    std::cout << "Kernel cumsumNaive execution time for m = " << m
+              << ", n = " << n << ": " << elapsed_time_kernel << " milliseconds"
+              << std::endl;
 
     CUDA_CALL(cudaMemcpy(h_out, d_out, size, cudaMemcpyDeviceToHost));
 
@@ -174,7 +178,71 @@ void cumsumNaive(const T *h_in, T *h_out, int m, int n) {
     CUDA_CALL(cudaFree(d_out));
 }
 
-void cumsumSingle(const int *h_in, int *h_out, int m, int n) {
+// Cumsum with single thread
+template <typename T>
+__global__ void cumsumSingleKernel(const T *d_in, T *d_out, int n) {
+    extern __shared__ T temp[];
+    long numPerThread = (n + blockDim.x - 1) / blockDim.x;
+    long tid = threadIdx.x;
+    long block_offset = blockIdx.x * n;
+    // 1. copy the data to shared memory
+    for (long i = 0; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
+        if (index < n) {
+            temp[index] = d_in[block_offset + index];
+        }
+    }
+    __syncthreads();
+
+    // 2. cumsum with only one thread
+    if (tid == 0) {
+        for (long i = 1; i < n; i++) {
+            temp[i] += temp[i - 1];
+        }
+    }
+    __syncthreads();
+
+    // 3. copy the data back to global memory
+    for (long i = 0; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
+        if (index < n) {
+            d_out[block_offset + index] = temp[index];
+        }
+    }
+}
+
+template <typename T>
+void cumsumSingle(const T *h_in, T *h_out, int m, int n) {
+    T *d_in, *d_out;
+    size_t size = m * n * sizeof(T);
+
+    CUDA_CALL(cudaMalloc((void **)&d_in, size));
+    CUDA_CALL(cudaMalloc((void **)&d_out, size));
+
+    CUDA_CALL(cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice));
+
+    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n));
+    dim3 blocksPerGrid(m);
+    clock_t start_kernel = clock();
+    cumsumSingleKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
+        d_in, d_out, n);
+    CUDA_LAST_ERROR();
+    CUDA_CALL(cudaDeviceSynchronize());
+    clock_t end_kernel = clock();
+    double elapsed_time_kernel =
+        double(end_kernel - start_kernel) * 1000.0 / CLOCKS_PER_SEC;
+    std::cout << "Kernel cumsumSingle execution time for m = " << m
+              << ", n = " << n << ": " << elapsed_time_kernel << " milliseconds"
+              << std::endl;
+
+    CUDA_CALL(cudaMemcpy(h_out, d_out, size, cudaMemcpyDeviceToHost));
+
+    CUDA_CALL(cudaFree(d_in));
+    CUDA_CALL(cudaFree(d_out));
+}
+
+// Cumsum with CPU single thread as golden
+void cumsumGolden(const int *h_in, int *h_out, int m, int n) {
     clock_t start = clock();
     for (int i = 0; i < m; i++) {
         h_out[i * n] = h_in[i * n];
@@ -184,8 +252,9 @@ void cumsumSingle(const int *h_in, int *h_out, int m, int n) {
     }
     clock_t end = clock();
     double elapsed_time = double(end - start) * 1000.0 / CLOCKS_PER_SEC;
-    std::cout << "Single cumsum execution time: " << elapsed_time
-              << " milliseconds" << std::endl;
+    std::cout << "Single cpu cumsum execution time for m = " << m
+              << ", n = " << n << ": " << elapsed_time << " milliseconds"
+              << std::endl;
 }
 
 bool checkDiff(const int *a, const int *b, long size) {
@@ -221,18 +290,31 @@ int main(int argc, char *argv[]) {
             h_in[i * n + j] = rand() % 10;  // Random numbers between 0 and 9
         }
     }
+    // Call cpu golden
+    std::cout << "\nRunning CPU single-threaded cumulative sum..." << std::endl;
+    cumsumGolden(h_in, h_out_cpu, m, n);
 
-    std::cout << "\nRunning single-threaded cumulative sum..." << std::endl;
-    cumsumSingle(h_in, h_out_cpu, m, n);
+    // Call single-threaded GPU cumsum
+    std::cout << "\nRunning single-threaded GPU cumulative sum..." << std::endl;
+    cumsumSingle(h_in, h_out, m, n);
+    std::cout << "Checking results of single-threaded GPU cumulative sum..."
+              << std::endl;
+    checkDiff(h_out, h_out_cpu, m * n);
 
+    // refill h_out
+    std::fill(h_out, h_out + m * n, 0);
+
+    // Call naive
     std::cout << "\nRunning naive parallel cumulative sum..." << std::endl;
     cumsumNaive(h_in, h_out, m, n);
     std::cout << "Checking results of naive parallel cumulative sum..."
               << std::endl;
     checkDiff(h_out, h_out_cpu, m * n);
 
+    // refill h_out
     std::fill(h_out, h_out + m * n, 0);
 
+    // Call belloch
     std::cout << "\nRunning Belloch parallel cumulative sum..." << std::endl;
     cumsumBelloch(h_in, h_out, m, n);
     std::cout << "Checking results of Belloch parallel cumulative sum..."

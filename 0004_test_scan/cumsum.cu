@@ -242,7 +242,8 @@ void cumsumSingle(const T *h_in, T *h_out, int m, int n) {
 }
 
 // Cumsum with CPU single thread as golden
-void cumsumGolden(const int *h_in, int *h_out, int m, int n) {
+template <typename T>
+void cumsumGolden(const T *h_in, T *h_out, int m, int n) {
     clock_t start = clock();
     for (int i = 0; i < m; i++) {
         h_out[i * n] = h_in[i * n];
@@ -257,7 +258,8 @@ void cumsumGolden(const int *h_in, int *h_out, int m, int n) {
               << std::endl;
 }
 
-bool checkDiff(const int *a, const int *b, long size) {
+template <typename T>
+bool checkDiff(const T *a, const T *b, long size) {
     for (long i = 0; i < size; i++) {
         if (a[i] != b[i]) {
             std::cout << "Difference found at index " << i << ": " << a[i]
@@ -278,9 +280,9 @@ int main(int argc, char *argv[]) {
     const long m = std::stol(argv[1]);
     const long n = std::stol(argv[2]);
 
-    int *h_in = new int[m * n];
-    int *h_out_cpu = new int[m * n];
-    int *h_out = new int[m * n];
+    char *h_in = new char[m * n];
+    char *h_out_cpu = new char[m * n];
+    char *h_out = new char[m * n];
 
     srand(time(0));
 

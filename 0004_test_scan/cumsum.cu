@@ -103,7 +103,6 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
 template <typename T>
 __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
     extern __shared__ T temp[];
-    long bufferOffset = n * sizeof(T);
     long numPerThread = (n + blockDim.x - 1) / blockDim.x;
     long tid = threadIdx.x;
     long block_offset = blockIdx.x * n;
@@ -122,8 +121,8 @@ __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
     for (long stride = 1; stride < n; stride *= 2, cnt++) {
         int readIdx = cnt % 2;
         int writeIdx = 1 - readIdx;
-        T *tempR = temp + readIdx * bufferOffset;
-        T *tempW = temp + writeIdx * bufferOffset;
+        T *tempR = temp + readIdx * n;
+        T *tempW = temp + writeIdx * n;
 
         for (long j = 0; j < numPerThread; j++) {
             long index = tid * numPerThread + j;
@@ -141,8 +140,7 @@ __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
     for (long i = 0; i < numPerThread; i++) {
         long index = tid * numPerThread + i;
         if (index < n) {
-            d_out[block_offset + index] =
-                temp[index + (cnt % 2) * bufferOffset];
+            d_out[block_offset + index] = temp[index + (cnt % 2) * n];
         }
     }
 }
@@ -224,10 +222,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::cout << "Running single-threaded cumulative sum..." << std::endl;
+    std::cout << "\nRunning single-threaded cumulative sum..." << std::endl;
     cumsumSingle(h_in, h_out_cpu, m, n);
 
-    std::cout << "Running naive parallel cumulative sum..." << std::endl;
+    std::cout << "\nRunning naive parallel cumulative sum..." << std::endl;
     cumsumNaive(h_in, h_out, m, n);
     std::cout << "Checking results of naive parallel cumulative sum..."
               << std::endl;
@@ -235,7 +233,7 @@ int main(int argc, char *argv[]) {
 
     std::fill(h_out, h_out + m * n, 0);
 
-    std::cout << "Running Belloch parallel cumulative sum..." << std::endl;
+    std::cout << "\nRunning Belloch parallel cumulative sum..." << std::endl;
     cumsumBelloch(h_in, h_out, m, n);
     std::cout << "Checking results of Belloch parallel cumulative sum..."
               << std::endl;

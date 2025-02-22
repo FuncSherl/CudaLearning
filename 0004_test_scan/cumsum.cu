@@ -9,36 +9,65 @@
 #define THREAD_BLOCK_LIMIT 1024
 
 template <typename T>
-__global__ void cumsumBellochKernel(const T *d_in, T *d_out, int n) {
+__global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     extern __shared__ T temp[];
-    long tid = threadIdx.x + threadIdx.y * blockDim.x;
+    long numPerThread = (n + blockDim.x - 1) / blockDim.x;
+    long tid = threadIdx.x;
     long block_offset = blockIdx.x * n;
 
-    if (tid < n) {
-        temp[tid] = d_in[block_offset + tid];
+    // 1. copy the data to shared memory
+    for (long i = 0; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
+        if (index < n) {
+            temp[index] = d_in[block_offset + index];
+        }
     }
     __syncthreads();
 
-    // Up-sweep phase (reduce)
-    for (long stride = 1; stride < n; stride *= 2) {
-        long index = (tid + 1) * stride * 2 - 1;
+    // 2. local cumsum of each block
+    for (long i = 1; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
         if (index < n) {
-            temp[index] += temp[index - stride];
+            temp[index] += temp[index - 1];
+        }
+    }
+    __syncthreads();
+
+    // 3. Up-sweep phase (reduce)
+    for (long stride = 1; stride < n; stride *= 2) {
+        long stride_idx = stride * numPerThread;
+        long index = (tid + 1) * stride_idx * 2 - 1;
+        if (index < n) {
+            temp[index] += temp[index - stride_idx];
         }
         __syncthreads();
     }
 
-    // Down-sweep phase (down)
+    // 4. Down-sweep phase (down)
     for (long stride = n / 4; stride > 0; stride /= 2) {
-        long index = (tid + 1) * stride * 2 - 1;
-        if (index + stride < n) {
-            temp[index + stride] += temp[index];
+        long stride_idx = stride * numPerThread;
+        long index = (tid + 1) * stride_idx * 2 - 1;
+        if (index + stride_idx < n) {
+            temp[index + stride_idx] += temp[index];
         }
         __syncthreads();
     }
 
-    if (tid < n) {
-        d_out[block_offset + tid] = temp[tid];
+    // 5. cumsum each local block
+    for (long i = 0; i < numPerThread - 1; i++) {
+        long index = (tid + 1) * numPerThread + i;
+        if (index < n) {
+            temp[index] += temp[(tid + 1) * numPerThread - 1];
+        }
+    }
+    __syncthreads();
+
+    // 6. copy the data back to global memory
+    for (long i = 0; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
+        if (index < n) {
+            d_out[block_offset + index] = temp[index];
+        }
     }
 }
 
@@ -52,8 +81,7 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
 
     CUDA_CALL(cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice));
 
-    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n),
-                         std::ceil(n * 1.0 / THREAD_BLOCK_LIMIT));
+    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n));
     dim3 blocksPerGrid(m);
     clock_t start_kernel = clock();
     cumsumBellochKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
@@ -75,28 +103,47 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
 template <typename T>
 __global__ void cumsumNaiveKernel(const T *d_in, T *d_out, int n) {
     extern __shared__ T temp[];
-    long tid = threadIdx.x + threadIdx.y * blockDim.x;
+    long bufferOffset = n * sizeof(T);
+    long numPerThread = (n + blockDim.x - 1) / blockDim.x;
+    long tid = threadIdx.x;
     long block_offset = blockIdx.x * n;
 
-    if (tid < n) {
-        temp[tid] = d_in[block_offset + tid];
+    // 1. copy the data to shared memory
+    for (long i = 0; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
+        if (index < n) {
+            temp[index] = d_in[block_offset + index];
+        }
     }
     __syncthreads();
 
-    for (long stride = 1; stride < n; stride *= 2) {
-        T val = 0;
-        if (tid >= stride && tid < n) {
-            val = temp[tid - stride];
-        }
-        __syncthreads();
-        if (tid < n) {
-            temp[tid] += val;
+    // 2. naive tree sum
+    int cnt = 0;
+    for (long stride = 1; stride < n; stride *= 2, cnt++) {
+        int readIdx = cnt % 2;
+        int writeIdx = 1 - readIdx;
+        T *tempR = temp + readIdx * bufferOffset;
+        T *tempW = temp + writeIdx * bufferOffset;
+
+        for (long j = 0; j < numPerThread; j++) {
+            long index = tid * numPerThread + j;
+
+            if (index >= stride && index < n) {
+                tempW[index] = tempR[index] + tempR[index - stride];
+            } else {
+                tempW[index] = tempR[index];
+            }
         }
         __syncthreads();
     }
 
-    if (tid < n) {
-        d_out[block_offset + tid] = temp[tid];
+    // 3. copy the data back to global memory
+    for (long i = 0; i < numPerThread; i++) {
+        long index = tid * numPerThread + i;
+        if (index < n) {
+            d_out[block_offset + index] =
+                temp[index + (cnt % 2) * bufferOffset];
+        }
     }
 }
 
@@ -110,11 +157,10 @@ void cumsumNaive(const T *h_in, T *h_out, int m, int n) {
 
     CUDA_CALL(cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice));
 
-    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n),
-                         std::ceil(n * 1.0 / THREAD_BLOCK_LIMIT));
+    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n));
     dim3 blocksPerGrid(m);
     clock_t start_kernel = clock();
-    cumsumNaiveKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
+    cumsumNaiveKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T) * 2>>>(
         d_in, d_out, n);
     CUDA_LAST_ERROR();
     CUDA_CALL(cudaDeviceSynchronize());

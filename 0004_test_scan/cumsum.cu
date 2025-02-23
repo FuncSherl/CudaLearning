@@ -22,7 +22,7 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     // Calculate the starting index for each thread and adjust the number of
     // elements per thread
     long indexStart = tid * numPerThread + min(tid, remain);
-    long numThisThread = numPerThread + (tid < remain) ? 1 : 0;
+    long numThisThread = numPerThread + ((tid < remain) ? 1 : 0);
 
     long block_offset = blockIdx.x * n;
 
@@ -74,7 +74,8 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     }
 
     // 5. cumsum each local block
-    for (long i = 0; i < numThisThread - 1; i++) {
+    long tidAddone = numPerThread + ((tid + 1 < remain) ? 1 : 0);
+    for (long i = 0; i < tidAddone - 1; i++) {
         long indexSt = (tid + 1) * numPerThread + min(tid + 1, remain);
         long index = indexSt + i;
         if (index < n) {
@@ -286,8 +287,14 @@ template <typename T>
 bool checkDiff(const T *a, const T *b, long size) {
     for (long i = 0; i < size; i++) {
         if (a[i] != b[i]) {
-            std::cout << "Difference found at index " << i << ": " << a[i]
-                      << " != " << b[i] << std::endl;
+            if constexpr (std::is_same<T, char>::value) {
+                std::cout << "Difference found at index " << i << ": "
+                          << static_cast<int>(a[i])
+                          << " != " << static_cast<int>(b[i]) << std::endl;
+            } else {
+                std::cout << "Difference found at index " << i << ": " << a[i]
+                          << " != " << b[i] << std::endl;
+            }
             return false;
         }
     }
@@ -303,14 +310,11 @@ int main(int argc, char *argv[]) {
 
     const long m = std::stol(argv[1]);
     const long n = std::stol(argv[2]);
-    // if ((n & (n - 1)) != 0) {
-    //     std::cerr << "Error: n must be a power of 2." << std::endl;
-    //     return 1;
-    // }
 
-    char *h_in = new char[m * n];
-    char *h_out_cpu = new char[m * n];
-    char *h_out = new char[m * n];
+    using dtype = char;
+    dtype *h_in = new dtype[m * n];
+    dtype *h_out_cpu = new dtype[m * n];
+    dtype *h_out = new dtype[m * n];
 
     srand(time(0));
 

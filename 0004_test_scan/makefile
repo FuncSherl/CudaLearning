@@ -2,7 +2,7 @@ BUILD_DIR = build
 MAKEFILE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 INCLUDE_DIR = $(MAKEFILE_PATH)/..
 
-CFLAGS_GPU = -g -std=c++14 -I$(INCLUDE_DIR) -Xptxas -v
+CFLAGS_GPU = -g -std=c++17 -I$(INCLUDE_DIR) -Xptxas -v
 CC_GPU = nvcc
 SOURCE_GPU = $(wildcard *.cu)
 EXECS_GPU = $(patsubst %.cu,$(BUILD_DIR)/%,$(SOURCE_GPU))

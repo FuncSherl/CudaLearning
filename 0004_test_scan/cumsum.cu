@@ -16,6 +16,7 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     assert((blockDim.x & (blockDim.x - 1)) == 0 &&
            "blockDim.x must be a power of 2");
 
+    long numThreads = blockDim.x;
     long remain = n % blockDim.x;
     long numPerThread = n / blockDim.x;
     long tid = threadIdx.x;
@@ -45,7 +46,7 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     __syncthreads();
 
     // 3. Up-sweep phase (reduce)
-    for (long stride = 1; stride < n; stride *= 2) {
+    for (long stride = 1; stride < numThreads; stride *= 2) {
         long index = (tid + 1) * stride * 2 - 1;
         long indexSt = index * numPerThread + min(index, remain) +
                        numPerThread + (index < remain) - 1;
@@ -60,7 +61,7 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     }
 
     // 4. Down-sweep phase (down)
-    for (long stride = n / 4; stride > 0; stride /= 2) {
+    for (long stride = numThreads / 4; stride > 0; stride /= 2) {
         long index = (tid + 1) * stride * 2 - 1;
         long indexSt = index * numPerThread + min(index, remain) +
                        numPerThread + (index < remain) - 1;

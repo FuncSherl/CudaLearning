@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
@@ -12,13 +13,22 @@
 template <typename T>
 __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     extern __shared__ T temp[];
-    long numPerThread = (n + blockDim.x - 1) / blockDim.x;
+    assert((blockDim.x & (blockDim.x - 1)) == 0 &&
+           "blockDim.x must be a power of 2");
+
+    long remain = n % blockDim.x;
+    long numPerThread = n / blockDim.x;
     long tid = threadIdx.x;
+    // Calculate the starting index for each thread and adjust the number of
+    // elements per thread
+    long indexStart = tid * numPerThread + min(tid, remain);
+    long numThisThread = numPerThread + (tid < remain) ? 1 : 0;
+
     long block_offset = blockIdx.x * n;
 
     // 1. copy the data to shared memory
-    for (long i = 0; i < numPerThread; i++) {
-        long index = tid * numPerThread + i;
+    for (long i = 0; i < numThisThread; i++) {
+        long index = indexStart + i;
         if (index < n) {
             temp[index] = d_in[block_offset + index];
         }
@@ -26,8 +36,8 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
     __syncthreads();
 
     // 2. local cumsum of each block
-    for (long i = 1; i < numPerThread; i++) {
-        long index = tid * numPerThread + i;
+    for (long i = 1; i < numThisThread; i++) {
+        long index = indexStart + i;
         if (index < n) {
             temp[index] += temp[index - 1];
         }
@@ -36,36 +46,46 @@ __global__ void cumsumBellochKernel(const T *d_in, T *d_out, long n) {
 
     // 3. Up-sweep phase (reduce)
     for (long stride = 1; stride < n; stride *= 2) {
-        long stride_idx = stride * numPerThread;
-        long index = (tid + 1) * stride_idx * 2 - 1;
-        if (index < n) {
-            temp[index] += temp[index - stride_idx];
+        long index = (tid + 1) * stride * 2 - 1;
+        long indexSt = index * numPerThread + min(index, remain) +
+                       numPerThread + (index < remain) - 1;
+        long indexEd = (index - stride) * numPerThread +
+                       min((index - stride), remain) + numPerThread +
+                       ((index - stride) < remain) - 1;
+
+        if (indexSt < n) {
+            temp[indexSt] += temp[indexEd];
         }
         __syncthreads();
     }
 
     // 4. Down-sweep phase (down)
     for (long stride = n / 4; stride > 0; stride /= 2) {
-        long stride_idx = stride * numPerThread;
-        long index = (tid + 1) * stride_idx * 2 - 1;
-        if (index + stride_idx < n) {
-            temp[index + stride_idx] += temp[index];
+        long index = (tid + 1) * stride * 2 - 1;
+        long indexSt = index * numPerThread + min(index, remain) +
+                       numPerThread + (index < remain) - 1;
+        long indexEd = (index + stride) * numPerThread +
+                       min((index + stride), remain) + numPerThread +
+                       ((index + stride) < remain) - 1;
+        if (indexEd < n) {
+            temp[indexEd] += temp[indexSt];
         }
         __syncthreads();
     }
 
     // 5. cumsum each local block
-    for (long i = 0; i < numPerThread - 1; i++) {
-        long index = (tid + 1) * numPerThread + i;
+    for (long i = 0; i < numThisThread - 1; i++) {
+        long indexSt = (tid + 1) * numPerThread + min(tid + 1, remain);
+        long index = indexSt + i;
         if (index < n) {
-            temp[index] += temp[(tid + 1) * numPerThread - 1];
+            temp[index] += temp[indexSt - 1];
         }
     }
     __syncthreads();
 
     // 6. copy the data back to global memory
-    for (long i = 0; i < numPerThread; i++) {
-        long index = tid * numPerThread + i;
+    for (long i = 0; i < numThisThread; i++) {
+        long index = indexStart + i;
         if (index < n) {
             d_out[block_offset + index] = temp[index];
         }
@@ -81,9 +101,12 @@ void cumsumBelloch(const T *h_in, T *h_out, int m, int n) {
     CUDA_CALL(cudaMalloc((void **)&d_out, size));
 
     CUDA_CALL(cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice));
-
-    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n));
+    // Calculate the next power of 2 greater than or equal to n
+    int n_pow2 = 1 << static_cast<int>(log2(n));
+    dim3 threadsPerBlock(std::min(THREAD_BLOCK_LIMIT, n_pow2));
     dim3 blocksPerGrid(m);
+    std::cout << "Launching kernel with " << blocksPerGrid.x << " blocks and "
+              << threadsPerBlock.x << " threads per block." << std::endl;
     clock_t start_kernel = clock();
     cumsumBellochKernel<<<blocksPerGrid, threadsPerBlock, n * sizeof(T)>>>(
         d_in, d_out, n);

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-M=1
+M=1024
 STEP=64
 for ((n=$STEP; n<=16384; n+=$STEP))
 do
